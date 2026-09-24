@@ -20,6 +20,7 @@ its correctness.
 from __future__ import annotations
 
 import argparse
+import gc
 import sys
 import time
 from pathlib import Path
@@ -40,6 +41,7 @@ from config import (  # noqa: E402
 from data_io import (  # noqa: E402
     load_ground_truth,
     load_source,
+    load_source_country,
     split_entities,
     write_candidate_pairs,
     write_matching_results,
@@ -71,12 +73,17 @@ def build_pairs(queries: pd.DataFrame, sources: dict[str, Path],
         if not path.exists():
             print(f"  !! {path.name} missing, its matches cannot be produced")
             continue
-        candidates = load_source(path, columns=COLUMNS)
         for country in sorted(queries["country"].unique()):
             q = queries[queries["country"] == country]
-            c = candidates[candidates["country"] == country]
+            if q.empty:
+                continue
+            # One country at a time, read straight out of Parquet with the
+            # filter pushed down. Loading the whole source and subsetting it
+            # afterwards peaks at several GB and sends this machine to swap.
+            c = load_source_country(path, country, columns=COLUMNS)
             if verbose:
-                print(f"  {tag} / {country}: {len(q):,} entities x {len(c):,} records")
+                print(f"  {tag} / {country}: {len(q):,} entities x {len(c):,} records",
+                      flush=True)
             t0 = time.time()
             # The vectorizer is fitted per block so that IDF reflects that
             # country's own vocabulary, "nagar" is common in India and rare in
@@ -91,9 +98,10 @@ def build_pairs(queries: pd.DataFrame, sources: dict[str, Path],
                 verbose=verbose,
             )
             if verbose:
-                print(f"    -> {len(pairs):,} pairs in {time.time()-t0:.0f}s")
+                print(f"    -> {len(pairs):,} pairs in {time.time()-t0:.0f}s", flush=True)
             frames.append(pairs)
-        del candidates
+            del c, vec
+            gc.collect()
 
     if not frames:
         return pd.DataFrame(columns=["source1_entity_id", "candidate_entity_id", "cos_name"])
@@ -151,22 +159,25 @@ def evaluate(pairs: pd.DataFrame, truth: dict[str, set[str]],
 
 
 def run_validate(sample: int) -> None:
-    print("Loading training data and ground truth...")
+    print("Loading training data and ground truth...", flush=True)
     s1 = load_source(TRAIN_SOURCES["S1"], columns=COLUMNS)
-    truth_all = load_ground_truth()
     _, val_ids = split_entities(s1["entity_id"].tolist())
 
     if sample and sample < len(val_ids):
         rng = np.random.default_rng(RANDOM_SEED)
         val_ids = [val_ids[i] for i in
                    rng.choice(len(val_ids), sample, replace=False)]
-        print(f"  sampling {sample:,} of the held-out entities for speed")
+        print(f"  sampling {sample:,} of the held-out entities for speed", flush=True)
 
     val_set = set(val_ids)
     queries = s1[s1["entity_id"].isin(val_set)].reset_index(drop=True)
-    truth = {k: truth_all[k] for k in val_ids}
+    # The full Source 1 frame and the unscored ground truth are both large and
+    # neither is needed past this point.
+    del s1
+    gc.collect()
+    truth = load_ground_truth(keep=val_set)
     print(f"  {len(queries):,} held-out Source 1 entities, "
-          f"{sum(len(v) for v in truth.values()):,} true links")
+          f"{sum(len(v) for v in truth.values()):,} true links", flush=True)
 
     pairs = build_pairs(queries, TRAIN_SOURCES)
     evaluate(pairs, truth, val_ids)

@@ -118,8 +118,39 @@ def build_all_caches(force: bool = False) -> None:
 
 
 def load_source(tsv_path: Path, columns: list[str] | None = None) -> pd.DataFrame:
-    """Read a source file from cache, building the cache first if needed."""
-    return pd.read_parquet(build_cache(tsv_path), columns=columns)
+    """Read a source file from cache, building the cache first if needed.
+
+    Uses the Arrow-backed dtypes so the string columns stay in Arrow buffers
+    rather than becoming millions of individual Python objects. On the 5 million
+    row sources that is the difference between a few hundred MB and several GB.
+    """
+    return pd.read_parquet(build_cache(tsv_path), columns=columns,
+                           dtype_backend="pyarrow")
+
+
+def list_countries(tsv_path: Path) -> list[str]:
+    """Distinct country labels in a source file.
+
+    Reads only that one column, so it costs almost nothing. The labels are
+    discovered rather than hard-coded, which is what lets France flow through
+    the pipeline without a special case.
+    """
+    col = pd.read_parquet(build_cache(tsv_path), columns=["country"],
+                          dtype_backend="pyarrow")["country"]
+    return sorted(col.dropna().unique().tolist())
+
+
+def load_source_country(tsv_path: Path, country: str,
+                        columns: list[str] | None = None) -> pd.DataFrame:
+    """Read only one country's rows, pushing the filter down into Parquet.
+
+    Loading a whole 5 million row source and then subsetting it peaks at several
+    GB before the subset is taken, which on a 16 GB machine means swapping. This
+    never materialises the rows we are going to discard.
+    """
+    return pd.read_parquet(build_cache(tsv_path), columns=columns,
+                           filters=[("country", "==", country)],
+                           dtype_backend="pyarrow")
 
 
 def iter_source_chunks(
@@ -133,13 +164,21 @@ def iter_source_chunks(
         yield batch.to_pandas()
 
 
-def load_ground_truth() -> dict[str, set[str]]:
-    """Read ``train_ground_truth.tsv`` into ``{source1_id: {matched ids}}``."""
+def load_ground_truth(keep: set[str] | None = None) -> dict[str, set[str]]:
+    """Read ``train_ground_truth.tsv`` into ``{source1_id: {matched ids}}``.
+
+    Pass ``keep`` to load only those Source 1 entities. The full file is 2.2
+    million entities holding 7.6 million IDs, which as Python sets costs a
+    couple of GB; when only a held-out slice is being scored, filtering while
+    reading avoids building the rest at all.
+    """
     truth: dict[str, set[str]] = {}
     with open(GROUND_TRUTH, encoding="utf-8", newline="") as fh:
         reader = csv.reader(fh, delimiter="\t")
         next(reader)
         for row in reader:
+            if keep is not None and row[0] not in keep:
+                continue
             ids = row[1] if len(row) > 1 else ""
             truth[row[0]] = {x for x in ids.split(",") if x}
     return truth

@@ -22,3 +22,5 @@ venv/
 .idea/
 .DS_Store
 Thumbs.db
+
+phase1_validate.log
