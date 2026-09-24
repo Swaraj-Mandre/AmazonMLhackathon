@@ -54,7 +54,7 @@ All measured by us. Rerun with
 Four findings that shape everything:
 
 1. **Only 5.58% of records have no match.** Submitting nothing for everyone
-   scores 0.0558. That is our floor, not a plan.
+   scores 0.0561. That is our floor, not a plan.
 2. **Every Source 2 or 3 record has at most one owner.** We checked all 7,638,365
    links. Zero exceptions. So we can force our answers to be exclusive, which
    costs a bit of recall and buys precision. The metric pays for precision.
@@ -132,6 +132,10 @@ Run `python src/metric.py` and `python src/normalize.py` to check they pass.
 
 ### Phase 1, done
 
+**Result: local F0.5 = 0.5659, candidate recall = 0.7123.** No machine learning
+at all, just TF-IDF cosine on the cleaned name with a threshold. For comparison,
+predicting nothing for everyone scores 0.0561.
+
 - `data_io.py` turns each TSV into a parquet cache with the cleaned columns
   already added, streaming in chunks so it never blows memory.
 - Validation split is **15% of Source 1 records, split by record, never by pair.**
@@ -139,26 +143,45 @@ Run `python src/metric.py` and `python src/normalize.py` to check they pass.
   all score on exactly the same held out set.
 - `blocking.py` shortlists candidates using TF-IDF cosine on the name, inside one
   country at a time.
-- `run_baseline.py` runs the whole thing end to end, no machine learning.
+- `run_baseline.py` runs the whole thing end to end and sweeps the threshold.
 
 ```bash
 python code/business_entity_resolution/src/run_baseline.py --validate
-python code/business_entity_resolution/src/run_baseline.py --predict --threshold 0.75
+python code/business_entity_resolution/src/run_baseline.py --predict --threshold 0.92 --no-exclusive --block-min 0.60
 ```
+
+Best settings found: accept threshold **0.92**, exclusivity **off**. The full
+sweep is in the experiment log.
+
+**Read the Method notes in [`experiments/experiments.md`](experiments/experiments.md)
+before you change the validation harness.** It builds its own candidate pool on
+purpose, sized to the test set's real ratio of 5.75 candidates per record. An
+earlier version did not, and produced a completely meaningless score. That
+section explains why.
 
 ### Phase 2, blocking, open
 
-**This is the most important phase left.** Whatever blocking misses is gone for
-good, no model downstream can get it back.
+**This is the most important phase left, by a long way.** Our candidate recall is
+**0.7123**, which means **29% of the real matches are never even looked at.** No
+model downstream can recover them. Every point of recall we add here raises the
+ceiling on everything in phases 3, 4 and 5.
 
-What to do:
-- Add more ways to find candidates, not just one. Character n-grams on the name,
-  word level TF-IDF, and an address number key (two records sharing a rare long
-  number like a PIN code plus a house number).
-- Print `candidate_recall()` and `reduction_ratio()` **every single time.** Target
-  recall 0.95 or better while keeping candidates per record in the low tens.
-- Keep memory in check: one country at a time, chunk the sparse multiply, keep
-  only top k per record.
+The single most promising fix, in order:
+
+1. **Scan in both directions and take the union.** Right now every Source 2 or 3
+   record proposes its top 5 Source 1 records. That direction alone loses recall
+   as the record count grows, and we measured it: a 40k sample gave 0.7971 recall,
+   the full 329k split gave 0.7123. At the real 1.73 million it will be worse. Add
+   the opposite scan, each Source 1 record proposing its top k candidates, and
+   merge the two candidate sets.
+2. **Add more ways to find candidates.** Character n-grams on the name, word level
+   TF-IDF, and an address number key (two records sharing a rare long number like
+   a PIN code plus a house number).
+3. **Print `candidate_recall()` and `reduction_ratio()` every single time.** Target
+   recall 0.95 or better while keeping candidates per record in the low tens.
+
+Keep memory in check: one country at a time, chunk the sparse multiply, keep only
+top k per record. See section 9 before you write loading code.
 
 ### Phase 3, pair features, open
 
@@ -235,3 +258,22 @@ as soon as we have one.
   accident.
 - **Say you are stuck after 30 minutes**, not after 3 hours.
 - Settle disagreements by running both and comparing F0.5, not by arguing.
+
+## 9. Memory, read this before writing loading code
+
+This dataset punishes careless loading. The machine we developed on has 16 GB with
+about 6.5 GB free, and the first validation run reached **8.7 GB and went to swap.**
+Three rules came out of fixing it:
+
+1. **Read parquet with the Arrow dtype backend.** `load_source()` already does.
+   Without it the string columns become millions of individual Python objects and
+   a 5 million row source costs several GB instead of a few hundred MB.
+2. **Never load a whole source and then filter it.** Use
+   `load_source_country(path, country)`, which pushes the filter down into parquet
+   so the rows you are going to throw away are never built at all.
+3. **Never build the full ground truth if you only need a slice.** Use
+   `load_ground_truth(keep=some_ids)`. All 2.2 million records with their 7.6
+   million IDs as Python sets costs a couple of GB on its own.
+
+Also: free big frames with `del` and call `gc.collect()` between country blocks.
+`run_baseline.py` shows the pattern.
