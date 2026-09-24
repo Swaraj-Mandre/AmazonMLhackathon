@@ -59,7 +59,7 @@ def macro_f_beta(
 
     ``truth`` defines the evaluation set. A Source 1 entity missing from ``pred``
     is treated as an empty prediction rather than skipped, which mirrors how the
-    leaderboard treats a submission that omits rows (there, it is a rejection —
+    leaderboard treats a submission that omits rows (there, it is a rejection -
     here it keeps the local score honest instead of silently flattering us).
     """
     if not truth:
@@ -96,7 +96,7 @@ def candidate_recall(
     truth: dict[str, set[str]],
     candidates: dict[str, set[str]],
 ) -> float:
-    """Share of true matches that survive blocking — our ceiling on recall.
+    """Share of true matches that survive blocking, our ceiling on recall.
 
     Anything lost here cannot be recovered by the matching model, so this is the
     number to watch while tuning candidate generation.
@@ -116,7 +116,7 @@ def reduction_ratio(
     """Fraction of the full cross-product that blocking discarded.
 
     1.0 means everything was pruned, 0.0 means we kept every possible pair.
-    Reported alongside :func:`candidate_recall` — the two trade off.
+    Reported alongside :func:`candidate_recall`, the two trade off.
     """
     full = len(candidates) * (n_source2 + n_source3)
     if full == 0:

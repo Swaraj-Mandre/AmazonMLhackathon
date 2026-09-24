@@ -1,7 +1,7 @@
 """Text normalisation for business names and addresses.
 
 Everything here is a deterministic, self-contained transformation of the strings
-in the provided data. No lookups, no external resources — the fair-play rules
+in the provided data. No lookups, no external resources, the fair-play rules
 forbid them, and the abbreviation and transliteration tables below are ordinary
 code, not data pulled from anywhere.
 
@@ -126,8 +126,8 @@ _ADDRESS_FORMS = {
     "saint": "st", "mount": "mt", "fort": "ft",
 }
 
-# Legal suffixes carry almost no discriminative power — nearly every Indian
-# business ends in "pvt ltd" — so a separate "core name" strips them entirely.
+# Legal suffixes carry almost no discriminative power, nearly every Indian
+# business ends in "pvt ltd", so a separate "core name" strips them entirely.
 _STRIPPABLE_SUFFIXES = {
     "corp", "inc", "co", "ltd", "pvt", "pub", "llp", "llc", "plc",
     "the", "and", "&",
@@ -142,8 +142,8 @@ _NUMBER_RE = re.compile(r"\d+")
 def _fold(text: str) -> str:
     """Lowercase, strip accents, and reduce to alphanumerics plus single spaces.
 
-    Accent stripping is what makes the French records comparable — ``Président``
-    and ``President`` must not be two different tokens — and it is script-safe
+    Accent stripping is what makes the French records comparable, ``Président``
+    and ``President`` must not be two different tokens, and it is script-safe
     because the decomposition only removes combining marks.
     """
     text = unicodedata.normalize("NFKD", text)

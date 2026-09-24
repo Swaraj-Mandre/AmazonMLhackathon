@@ -1,249 +1,237 @@
-# Business Entity Resolution — Amazon ML Challenge 2026
+# Amazon ML Challenge 2026: Business Entity Resolution
 
-Team working repository. **Read this file first, then check
-[`experiments/experiments.md`](experiments/experiments.md) for the latest scores.**
+Team repo. **Read this file top to bottom before you write any code.**
 
-Whoever picks the work up next: the phase table below says what is done, what is
-in progress, and what to start. Claim a phase in the team chat before you begin
-so two people don't build the same thing.
-
----
-
-## 1. The task in one paragraph
-
-Three sources of business records (`business_name`, `business_address`,
-`country`) with no shared identifiers. **Source 1 is the deduplicated reference
-list.** For every Source 1 entity, output every Source 2 and Source 3 record that
-refers to the same real-world business — zero, one, or many.
-
-Scored on **F₀.₅ (precision-weighted 2×), macro-averaged per Source 1 entity**,
-singletons included. Predicting an empty list for a true singleton scores a full
-1.0; predicting anything for it scores 0.0.
+Quick links:
+- Approach explained in plain words: [`docs/Approach_Pitch.docx`](docs/Approach_Pitch.docx)
+- Score log, every run we do: [`experiments/experiments.md`](experiments/experiments.md)
+- Official problem statement: [`data/raw/provided/PROBLEM_STATEMENT.md`](data/raw/provided/PROBLEM_STATEMENT.md)
 
 ---
 
-## 2. What the data actually looks like
+## 1. What we have to build
 
-Measured, not assumed — regenerate with
+Three files of business records. Same shop can appear in all three, spelled
+differently, with no ID linking them.
+
+- **Source 1** is the clean master list.
+- For every Source 1 record, output every **Source 2 and Source 3** record that is
+  the same real business.
+- A record can have **zero, one, or many** matches. Average is 3.46.
+
+## 2. How we are scored
+
+Metric is **F0.5**, worked out for each Source 1 record separately, then averaged.
+
+**Precision counts twice as much as recall.** A wrong match hurts more than a
+missed one.
+
+| Situation | What we predict | Score for that record |
+|---|---|---|
+| 1 real match | exactly it | 1.00 |
+| 1 real match | it plus one wrong | 0.56 |
+| 1 real match | nothing | 0.00 |
+| No real match | nothing | 1.00 |
+| No real match | anything | 0.00 |
+
+**Rule of thumb: when the model is not sure, predict nothing.**
+
+## 3. What we found in the data
+
+All measured by us. Rerun with
 `python code/business_entity_resolution/src/profile_data.py`.
 
 | File | Rows | Countries |
 |---|---:|---|
-| `train_source1.tsv` | 2,206,821 | US 60.0%, India 40.0% |
-| `train_source2.tsv` | 5,034,616 | US 59.9%, India 40.1% |
-| `train_source3.tsv` | 5,285,603 | US 60.0%, India 40.0% |
-| `train_ground_truth.tsv` | 2,206,821 | — |
-| `test_source1.tsv` | 1,732,544 | India 46.8%, US 38.3%, **France 15.0%** |
-| `test_source2.tsv` | 4,887,273 | India 47.3%, US 38.3%, France 14.4% |
-| `test_source3.tsv` | **NOT DELIVERED** | — |
+| train_source1 | 2,206,821 | US 60%, India 40% |
+| train_source2 | 5,034,616 | US 60%, India 40% |
+| train_source3 | 5,285,603 | US 60%, India 40% |
+| train_ground_truth | 2,206,821 | n/a |
+| test_source1 | 1,732,544 | India 47%, US 38%, **France 15%** |
+| test_source2 | 4,887,273 | India 47%, US 38%, France 14% |
+| test_source3 | 5,082,316 | n/a |
 
-### Five findings that drive the whole design
+Four findings that shape everything:
 
-1. **Singletons are only 5.58%** of Source 1 entities. An all-empty submission
-   scores exactly **0.0558** — that is the floor, not a strategy. But false
-   merges on those 123k entities still cost a full point each.
-2. **Mean 3.46 matches per entity**, and 91% of entities have between 1 and 6.
-   Max observed is 11. This is a multi-match problem, not a 1:1 linkage.
-3. **Every Source 2/3 record belongs to at most one Source 1 entity.** Verified
-   across all 7,638,365 match links — zero reuse. This is a hard structural
-   constraint we can exploit: predictions can be made mutually exclusive on the
-   right-hand side, which converts a thresholding problem into an assignment
-   problem and should buy precision for free.
-4. **Matches never cross country labels.** 1,038,755 sampled links, 0 exceptions.
-   Country is therefore a lossless blocking key that cuts the pair space ~2.6×.
-   Group by whatever label appears — never hard-code `{US, India}`, since 15% of
-   the test set is France and must still be matched.
-5. **~10% of Indian match links are Latin → Devanagari.** Source 1 is always
-   Latin; Source 2/3 sometimes are not. Character n-grams score exactly zero
-   across scripts, so transliteration is mandatory, not a nicety. Handled in
-   `normalize.py`.
+1. **Only 5.58% of records have no match.** Submitting nothing for everyone
+   scores 0.0558. That is our floor, not a plan.
+2. **Every Source 2 or 3 record has at most one owner.** We checked all 7,638,365
+   links. Zero exceptions. So we can force our answers to be exclusive, which
+   costs a bit of recall and buys precision. The metric pays for precision.
+3. **Matches never cross countries.** 1,038,755 links checked, zero exceptions.
+   Country is a free filter that cuts the work by about 2.6 times.
+4. **About 10% of Indian matches are Latin to Devanagari.** Source 1 is always
+   Latin. Word overlap scores zero across two scripts, so those matches are
+   invisible unless we convert first. Our converter is in `normalize.py`.
 
----
+## 4. Folder layout
 
-## 3. Blocking issue: `test_source3.tsv` is missing
-
-The download we have contains `test_source1` and `test_source2` but **not
-`test_source3`** — the zip is named `...-1-001.zip`, which is how Google Drive
-names the *first part* of a split download. The missing file is almost certainly
-in a second part.
-
-**Action for the team leader:** go back to the portal download link and fetch the
-remaining part(s), then drop `test_source3.tsv` into `data/raw/test/`.
-
-This does **not** block development. Every phase below is built and scored on the
-training data. It only blocks generating the final submission, because a Source 1
-entity's matches can come from Source 3 and we would silently emit none.
-
----
-
-## 4. Repository layout
-
-This mirrors the required submission zip, so packaging on day 3 is a zip command
-and not a reorganisation.
+Matches the submission zip Amazon wants, so packaging on day 3 is just a zip.
 
 ```
-.
-├── data/
-│   ├── raw/train/            provided TSVs (gitignored — download separately)
-│   ├── raw/test/             provided TSVs (gitignored)
-│   ├── raw/provided/         problem statement, doc template, official validator
-│   └── interim/              cached parquet + blocking artefacts (gitignored)
-├── code/business_entity_resolution/
-│   ├── src/                  all pipeline code
-│   ├── README.md             how to reproduce end-to-end
-│   └── requirements.txt      pinned dependencies
-├── output/                   matching_results.tsv + candidate_pairs.tsv
-├── experiments/              the experiment log — every run goes here
-└── docs/                     source emails, problem statement PDFs, notes
+data/raw/train/        the 4 training files (not in git, too big)
+data/raw/test/         the 3 test files (not in git)
+data/raw/provided/     problem statement, doc template, official validator
+data/interim/          parquet cache we build (not in git)
+code/business_entity_resolution/src/    all our code
+output/                the 2 files we submit
+experiments/           score log
+docs/                  the approach doc, source emails, PDFs
 ```
 
-## 5. Setup
+## 5. Setup, do this first
 
 ```bash
+git clone https://github.com/Swaraj-Mandre/AmazonMLhackathon.git
+cd AmazonMLhackathon
 pip install -r code/business_entity_resolution/requirements.txt
 ```
 
-Put the provided data in `data/raw/train/` and `data/raw/test/`, then confirm:
+The data is **not** in git, it is 2 GB. Get the files from the leader's download
+link and put them in `data/raw/train/` and `data/raw/test/`. Then check it worked:
 
 ```bash
 python code/business_entity_resolution/src/profile_data.py
 ```
 
----
+Build the parquet cache once. Takes about 25 minutes, then everything after is
+fast:
 
-## 6. Phases
+```bash
+python code/business_entity_resolution/src/data_io.py --build-cache
+```
 
-Each phase ends with something runnable and a number in the experiment log.
-**Do not start a later phase before its dependency is green** — a feature built
-on a broken validation split wastes the whole day.
+## 6. Phases, claim one in the group chat before you start
 
-| # | Phase | Status | Owner | Est. | Depends on |
+| # | Phase | Status | Who | Time | Needs |
 |---|---|---|---|---|---|
-| 0 | Setup, profiling, metric, normalisation | ✅ **done** | — | — | — |
-| 1 | Data loading + validation split + rules baseline | ⬜ open | | 4–6 h | 0 |
-| 2 | Blocking / candidate generation | ⬜ open | | 6–8 h | 1 |
-| 3 | Pairwise features | ⬜ open | | 5–7 h | 2 |
-| 4 | Classifier + exclusive assignment | ⬜ open | | 6–8 h | 3 |
-| 5 | Threshold tuning + generalisation check | ⬜ open | | 3–4 h | 4 |
-| 6 | Packaging + methodology document | ⬜ open | | 3 h | 5 |
+| 0 | Setup, profiling, metric, text cleaning | done | | | |
+| 1 | Data loading, validation split, rules baseline | done | | | 0 |
+| 2 | Better blocking | open | | 6 to 8 h | 1 |
+| 3 | Pair features | open | | 5 to 7 h | 2 |
+| 4 | Classifier plus exclusivity | open | | 6 to 8 h | 3 |
+| 5 | Threshold tuning, France check | open | | 3 to 4 h | 4 |
+| 6 | Packaging, methodology doc | open | | 3 h | 5 |
 
-Roughly 30–36 person-hours. Across three or four people working in parallel that
-fits the 72-hour window with real margin — **provided phases 1 and 2 are not
-allowed to slip**, because everything downstream is blocked on them.
-
-### Phase 0 — Setup and profiling ✅ done
-
-- `src/config.py` — every path in one place, derived from the file's own
-  location so the pipeline runs identically from the repo or the extracted zip.
-- `src/metric.py` — official F₀.₅, macro-averaged. **Verified against the
-  problem statement's worked example: 0.714286.** Also provides
-  `candidate_recall()` and `reduction_ratio()`, the two numbers Amazon uses to
-  audit blocking quality.
-- `src/normalize.py` — Devanagari→Latin transliteration, accent folding (needed
-  for France), legal-form and street-type abbreviation folding, numeric token
-  extraction.
-- `src/profile_data.py` — regenerates every statistic in section 2.
-
-Run the self-tests: `python src/metric.py` and `python src/normalize.py`.
-
-### Phase 1 — Data loading, validation split, rules baseline ⬜
-
-**Goal: a scored submission on the leaderboard.**
-
-1. `src/data_io.py` — convert each TSV to parquet once in `data/interim/`
-   (columnar reads are far faster and the machine only has ~6.6 GB free RAM;
-   the raw text is ~2 GB). Provide chunked iteration for anything that cannot
-   fit.
-2. Hold out **15% of Source 1 entities** (`VALIDATION_FRACTION` in `config.py`).
-   **Split by entity, never by pair** — a pair-level split leaks the answer and
-   makes every local number a lie.
-3. `src/run_baseline.py` — normalise, group by country, TF-IDF character
-   n-grams on `core_name`, top-k nearest neighbours, accept above a fixed cosine
-   threshold. No ML.
-4. Write both output TSVs, run the official validator, hand to the leader.
-
-**Done when:** a local F₀.₅ is recorded in the experiment log and the official
-validator exits 0.
-
-### Phase 2 — Blocking / candidate generation ⬜
-
-**This sets the ceiling on recall. A true match not in the candidate set can
-never be recovered downstream — no model fixes it.**
-
-- Block within `country` (lossless, verified) and generate candidates per source.
-- Combine several recall channels rather than one: character n-gram TF-IDF on
-  name, token-level TF-IDF, and an address-number key (records sharing a rare
-  long number such as a postcode plus a house number).
-- Report `candidate_recall()` and `reduction_ratio()` on the held-out split
-  **every time**. Target recall ≥ 0.95 while keeping candidates per entity in the
-  low tens.
-- Memory: process one country at a time, chunk the sparse matrix multiply, and
-  keep only top-k per Source 1 entity.
-
-### Phase 3 — Pairwise features ⬜
-
-For each candidate pair, build a feature row. Start with:
-
-- TF-IDF cosine on name, on `core_name`, and on address
-- `rapidfuzz` token-set ratio, partial ratio, Jaro-Winkler on both fields
-- Jaccard over name tokens
-- **IDF-weighted rare-token overlap** — sharing "Zephay" means vastly more than
-  sharing "Restaurant". Usually one of the strongest features in this task.
-- Address number overlap: exact match on the longest number (postcode), count of
-  shared numbers, whether either side has none
-- Length ratios, token counts, a flag for whether the source record was
-  transliterated, and whether the address was empty (3.3% of S2/S3 rows)
-
-Do **not** add a raw `country` one-hot — it encodes the training countries and
-will behave unpredictably on France. A same-country boolean is fine (and is
-always true after Phase 2 blocking, so it carries no information anyway).
-
-### Phase 4 — Classifier and exclusive assignment ⬜
-
-- LightGBM on the pair features. Positives from the ground truth; negatives are
-  the **hard** ones — candidates your own blocking produced that are not true
-  matches. Random negatives teach the model nothing useful.
-- Then exploit finding #3: each Source 2/3 record may belong to **at most one**
-  Source 1 entity. Resolve conflicts where two Source 1 entities both claim the
-  same record, keeping the higher-scoring claim. Free precision, and precision is
-  what F₀.₅ pays for.
-
-### Phase 5 — Threshold tuning and generalisation ⬜
-
-- Sweep the accept threshold against F₀.₅ on the held-out split. Expect the
-  optimum well above 0.5 — the metric punishes false merges twice as hard.
-  **This sweep is usually worth more than another modelling idea.**
-- Treat "predict empty" as a real decision, not a fallback.
-- **The France check:** train on US records only, validate on India only. If the
-  score collapses, the pipeline has learned country-specific patterns and 15% of
-  the test set will fail. Cheap to run, catches the single biggest trap.
-
-### Phase 6 — Packaging and methodology ⬜
-
-- `<team_name>_submission.zip` with `output/`, `code/business_entity_resolution/`,
-  and the filled-in `Documentation_template.md`.
-- The template lives at `data/raw/provided/Documentation_template.md`. **No page
-  limit** — the problem statement asks for technical depth, and the top teams'
-  packages are reviewed in detail before final rankings.
-- Regenerate both TSVs in the same run so `matching_results` is genuinely a
-  subset of `candidate_pairs`. The validator warns when it is not.
+About 25 to 30 hours of work left. Split across 3 or 4 people that fits, **as
+long as phase 2 does not slip**, because 3, 4 and 5 all wait on it.
 
 ---
 
-## 7. Rules that get you disqualified
+### Phase 0, done
 
-- **No external data lookup.** No entity-resolution APIs, no business registries,
-  **no geocoding APIs for address normalisation**, no internet augmentation. Code
-  pipelines are reviewed. Everything in this repo derives from the provided data.
-- Final model must be **MIT/Apache-2.0 licensed and ≤ 8B parameters**.
-- Max **5 leaderboard uploads per day**, 15 total. Only the registered team
-  leader can access the portal.
-- Nothing goes up unless it beats our best local F₀.₅ **and** the official
-  validator exits 0:
+- `config.py` holds every file path. Nothing else hardcodes a path.
+- `metric.py` is the official F0.5. **Checked against the example in the problem
+  statement, gives 0.714286.** Also has `candidate_recall()` and
+  `reduction_ratio()`, the two numbers Amazon uses to judge our blocking.
+- `normalize.py` cleans text: Devanagari to Latin, accent stripping for French,
+  abbreviation folding (Pvt Ltd equals Private Limited), number extraction.
+- `profile_data.py` regenerates every number in section 3.
+
+Run `python src/metric.py` and `python src/normalize.py` to check they pass.
+
+### Phase 1, done
+
+- `data_io.py` turns each TSV into a parquet cache with the cleaned columns
+  already added, streaming in chunks so it never blows memory.
+- Validation split is **15% of Source 1 records, split by record, never by pair.**
+  A pair split leaks the answer and makes every local score a lie. Seeded, so we
+  all score on exactly the same held out set.
+- `blocking.py` shortlists candidates using TF-IDF cosine on the name, inside one
+  country at a time.
+- `run_baseline.py` runs the whole thing end to end, no machine learning.
+
+```bash
+python code/business_entity_resolution/src/run_baseline.py --validate
+python code/business_entity_resolution/src/run_baseline.py --predict --threshold 0.75
+```
+
+### Phase 2, blocking, open
+
+**This is the most important phase left.** Whatever blocking misses is gone for
+good, no model downstream can get it back.
+
+What to do:
+- Add more ways to find candidates, not just one. Character n-grams on the name,
+  word level TF-IDF, and an address number key (two records sharing a rare long
+  number like a PIN code plus a house number).
+- Print `candidate_recall()` and `reduction_ratio()` **every single time.** Target
+  recall 0.95 or better while keeping candidates per record in the low tens.
+- Keep memory in check: one country at a time, chunk the sparse multiply, keep
+  only top k per record.
+
+### Phase 3, pair features, open
+
+For every shortlisted pair, build a row of numbers:
+- TF-IDF cosine on name, on core name, on address
+- `rapidfuzz` token set ratio, partial ratio, Jaro-Winkler on both fields
+- Jaccard over name words
+- **Rare word overlap, weighted by IDF.** Sharing "Zephay" means far more than
+  sharing "Restaurant". Usually the strongest feature in this kind of task.
+- Address numbers: does the longest number match (that is usually the PIN code),
+  how many numbers are shared, does either side have none
+- Length ratios, word counts, was the record transliterated, was the address empty
+  (3.3% of Source 2 and 3 rows have no address)
+
+**Do not one-hot the country.** It encodes US and India and will do something
+unpredictable on France.
+
+### Phase 4, classifier, open
+
+- LightGBM on those features.
+- Positives come from the ground truth.
+- **Negatives must be the near misses our own blocking produced**, not random
+  pairs. Random pairs are too easy and teach the model nothing.
+- Then apply finding 2: if two Source 1 records claim the same partner, keep only
+  the stronger claim.
+
+### Phase 5, thresholds, open
+
+- Sweep the accept threshold against F0.5 on the held out set. Expect the best one
+  to sit high.
+- **This sweep usually gains more score than another model idea.** Do not skip it.
+- **France check:** train on US records only, test on India only. If the score
+  falls apart, our pipeline learned country specific habits and 15% of the test
+  set will fail. Cheap to run, catches the biggest trap.
+
+### Phase 6, packaging, open
+
+- Zip: `output/`, `code/business_entity_resolution/`, and the filled in
+  `Documentation_template.md` (it is in `data/raw/provided/`).
+- **No page limit** on the methodology doc. Amazon reads the top teams' packages
+  in detail.
+- Regenerate both TSVs in the same run so the matches really are a subset of the
+  candidates.
+
+---
+
+## 7. Rules, read these once
+
+Things that get us disqualified:
+- **No outside data.** No entity resolution APIs, no business registries, **no
+  geocoding APIs for addresses**, no data pulled from the internet. They review
+  the code.
+- Final model must be **MIT or Apache 2.0 licensed and 8B parameters or less**.
+- **5 uploads per day, 15 total.** Only the team leader can access the portal.
+
+Before anything is uploaded:
+1. It must beat our best local F0.5.
+2. The official validator must pass:
 
 ```bash
 python data/raw/provided/validate_submission.py --matching output/matching_results.tsv --candidate output/candidate_pairs.tsv --test-dir data/raw/test
 ```
 
-Ties on the leaderboard are broken by **earlier submission time**, so upload a
-good result as soon as it exists rather than sitting on it.
+Ties on the leaderboard go to whoever submitted earlier, so upload a good result
+as soon as we have one.
+
+## 8. Working rules
+
+- **Log every run** in `experiments/experiments.md`, including failures. If it is
+  not logged, it did not happen and we cannot write it up later.
+- **Nobody changes the validation split.** If it changes, every earlier number
+  becomes meaningless.
+- **Only the leader uploads.** Two people uploading burns the daily cap by
+  accident.
+- **Say you are stuck after 30 minutes**, not after 3 hours.
+- Settle disagreements by running both and comparing F0.5, not by arguing.

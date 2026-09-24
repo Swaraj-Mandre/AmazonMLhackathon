@@ -1,4 +1,4 @@
-# Business Entity Resolution — pipeline
+# Business Entity Resolution pipeline
 
 Self-contained pipeline for the Amazon ML Challenge 2026 Business Entity
 Resolution task. Regenerates both required output files from the provided
@@ -10,7 +10,7 @@ training and test data using only what is in this folder.
 pip install -r requirements.txt
 ```
 
-Python 3.11+. No GPU required — the pipeline is CPU-only by design. No
+Python 3.11+. No GPU required, the pipeline is CPU-only by design. No
 pretrained model is used, so the MIT/Apache-2.0 and 8B-parameter constraints are
 satisfied trivially.
 
@@ -31,13 +31,13 @@ data/raw/test/{test_source1,test_source2,test_source3}.tsv
 python src/profile_data.py
 
 # 2. Normalise, block, match, and write both output files
-python src/run_baseline.py          # phase 1 — rules only
+python src/run_baseline.py          # phase 1, rules only
 ```
 
 Both files are written to `output/` at the repository root:
 
-- `matching_results.tsv` — final matches (uploaded to the portal)
-- `candidate_pairs.tsv` — the candidate set fed to the matching model
+- `matching_results.tsv`, final matches (uploaded to the portal)
+- `candidate_pairs.tsv`, the candidate set fed to the matching model
 
 ## Validating before submission
 
@@ -66,7 +66,7 @@ Three measured properties of the data shape the pipeline:
 
 1. **Matches never cross country labels** (0 exceptions in 1,038,755 sampled
    links), so blocking groups by whatever country label is present. The label is
-   treated as an open set — the test data contains France, which never appears
+   treated as an open set, the test data contains France, which never appears
    in training.
 2. **Each Source 2/3 record belongs to at most one Source 1 entity** (0 reuse
    across all 7,638,365 training links), so final predictions can be made

@@ -1,8 +1,8 @@
-# AWS Builder Center — ML Challenge 2026 Prep Guide (captured notes)
+# AWS Builder Center, ML Challenge 2026 Prep Guide (captured notes)
 
 Source: https://builder.aws.com/content/3HiM6zDmFrF98fRzOUETnGFDoqz/amazon-ml-challenge-2026-your-complete-prep-guide-with-live-demo
 Author: Jatin, Developer Advocate @ AWS. Published 21 Sep 2026, modified 23 Sep 2026.
-Captured: 24 Sep 2026. **Partial — see "Not captured" at the bottom.**
+Captured: 24 Sep 2026. **Partial, see "Not captured" at the bottom.**
 
 ---
 
@@ -30,7 +30,7 @@ Captured: 24 Sep 2026. **Partial — see "Not captured" at the bottom.**
 
 **Caveats called out in the guide:**
 - Set billing alerts in the console immediately after creating the account.
-- Always delete endpoints when done — they charge ~$0.12/hour even while idle.
+- Always delete endpoints when done, they charge ~$0.12/hour even while idle.
 - Use `us-east-1` for best compatibility.
 
 ## Services you need to understand
@@ -38,7 +38,7 @@ Captured: 24 Sep 2026. **Partial — see "Not captured" at the bottom.**
 | Service | Role in this challenge |
 |---|---|
 | EC2 | SageMaker training jobs run on EC2 behind the scenes |
-| S3 | Data in, trained models out — everything flows through it |
+| S3 | Data in, trained models out, everything flows through it |
 | DynamoDB | Results, metadata, feature stores at scale |
 | IAM | The role that lets SageMaker read your data and spin up machines |
 | VPC | Private network your SageMaker resources run in; Quick Setup creates one |
@@ -52,13 +52,13 @@ Steps:
 2. Create notebook instance, any name
 3. Instance type `ml.t3.medium` (free tier, 250 hours)
 4. IAM Role → Create a new role → leave defaults → Create role
-5. Create notebook instance, wait 2–3 min for **InService**
+5. Create notebook instance, wait 2-3 min for **InService**
 6. Open JupyterLab → "+" → `conda_python3` notebook
 
 **Guide's recommendation for the challenge specifically:**
 > Notebook Instance + local training + local prediction. You submit a CSV, not a running API.
 
-i.e. don't waste time deploying endpoints — train inside the notebook, predict locally, write the CSV.
+i.e. don't waste time deploying endpoints, train inside the notebook, predict locally, write the CSV.
 
 - **Local training vs Training Job:** local runs on the notebook's own CPU with data already in memory, no S3 upload. A Training Job spins up a separate, more powerful machine that pulls from S3. Use local when data is small; use Training Jobs when you need big machines or GPUs.
 - **Local prediction vs Endpoint:** `model.predict()` is instant in the notebook. An endpoint is a 24/7 hosted API at $0.12/hour even when idle.
@@ -100,7 +100,7 @@ params = {"max_depth": 5, "eta": 0.2, "gamma": 4, "min_child_weight": 6, ...}
 ## Advice the guide gives that's worth keeping
 
 - **Check the target distribution before anything else.** The demo dataset is a balanced 50/50; the guide warns the challenge data "might be heavily skewed to one side," and that changes how you build *and* evaluate.
-- **The challenge data will not be clean** — expect missing values and noise, unlike the demo's 21 clean columns.
+- **The challenge data will not be clean**, expect missing values and noise, unlike the demo's 21 clean columns.
 - **Drop unique IDs, serial numbers, row numbers.** They add nothing.
 - **"Feature engineering often matters more than your choice of algorithm. Spend 70% of your time here."**
 - **SageMaker's built-in XGBoost has two rules:** no column headers in the CSV, and the target must be the **first** column. The guide calls this the number one beginner mistake.

@@ -1,0 +1,1 @@
+- [Amazon ML Challenge 2026](amazon-ml-challenge-2026.md), this directory is a 72-hour entity-resolution hackathon entry; rules, metric and hard constraints.

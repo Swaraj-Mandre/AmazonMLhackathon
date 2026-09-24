@@ -1,0 +1,375 @@
+<title>ML Challenge War Room</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    color-scheme: light;
+    --ground:#F1F3F6;
+    --surface:#FFFFFF;
+    --surface-2:#F7F9FB;
+    --line:#D7DDE6;
+    --line-soft:#E6EAF0;
+    --ink:#171B22;
+    --muted:#5C6673;
+    --accent:#1F4F82;
+    --accent-soft:#E4EDF7;
+    --warn:#A9501C;
+    --warn-soft:#F8EADF;
+    --danger:#94232A;
+    --danger-soft:#F9E5E5;
+    --ok:#2C6A4E;
+    --ok-soft:#E3F0E9;
+    --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+    --body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+    --mono:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --ground:#13161B; --surface:#1A1E25; --surface-2:#20252D;
+      --line:#2D333D; --line-soft:#242A33;
+      --ink:#E6EAF0; --muted:#98A2AF;
+      --accent:#7FB2E8; --accent-soft:#1C2A3A;
+      --warn:#E09A60; --warn-soft:#2E241A;
+      --danger:#E88B86; --danger-soft:#2E1C1D;
+      --ok:#74C09A; --ok-soft:#1A2A22;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --ground:#13161B; --surface:#1A1E25; --surface-2:#20252D;
+    --line:#2D333D; --line-soft:#242A33;
+    --ink:#E6EAF0; --muted:#98A2AF;
+    --accent:#7FB2E8; --accent-soft:#1C2A3A;
+    --warn:#E09A60; --warn-soft:#2E241A;
+    --danger:#E88B86; --danger-soft:#2E1C1D;
+    --ok:#74C09A; --ok-soft:#1A2A22;
+  }
+
+  body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55;padding-inline:20px;padding-block:0;}
+  .wrap{max-width:900px;margin:0 auto;padding-block:32px 64px;display:flex;flex-direction:column;gap:38px;}
+
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);}
+  h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,5.4vw,42px);line-height:1.08;margin:8px 0 0;text-wrap:balance;letter-spacing:-.015em;}
+  h2{font-family:var(--display);font-weight:600;font-size:19px;letter-spacing:-.005em;margin:0;text-wrap:balance;}
+  h3{font-family:var(--display);font-weight:600;font-size:15px;margin:0;}
+  p{margin:0;}
+  section{display:flex;flex-direction:column;gap:14px;}
+  .sechead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:8px;}
+  .sechead .eyebrow{margin-left:auto;}
+
+  header .lede{color:var(--muted);max-width:64ch;margin-top:12px;font-size:17px;}
+  .clockline{margin-top:18px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-family:var(--mono);font-size:12.5px;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:12px 14px;}
+  .clockline b{font-weight:600;color:var(--accent);}
+  .clockline span{white-space:nowrap;}
+
+  .alert{background:var(--warn-soft);border:1px solid var(--warn);border-radius:4px;padding:16px 18px;display:flex;flex-direction:column;gap:9px;}
+  .alert h2{color:var(--warn);}
+  .alert ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:7px;font-size:15px;}
+  .alert li::marker{color:var(--warn);}
+
+  .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:4px;overflow:hidden;}
+  .fact{background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:4px;}
+  .fact dt{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);}
+  .fact dd{margin:0;font-family:var(--display);font-weight:600;font-size:17px;font-variant-numeric:tabular-nums;}
+  .fact .sub{font-size:13px;color:var(--muted);font-family:var(--body);font-weight:400;}
+
+  .redlines{background:var(--danger-soft);border:1px solid var(--danger);border-radius:4px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;}
+  .redlines h2{color:var(--danger);}
+  .redlines ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:7px;font-size:15px;}
+  .redlines li::marker{color:var(--danger);}
+
+  .pipeline{display:flex;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--surface);}
+  .stage{display:grid;grid-template-columns:34px 1fr;gap:14px;padding:15px 16px;border-top:1px solid var(--line-soft);}
+  .pipeline .stage:first-child{border-top:none;}
+  .stage .n{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:3px;height:24px;display:flex;align-items:center;justify-content:center;}
+  .stage .body{display:flex;flex-direction:column;gap:6px;}
+  .stage .body p{font-size:14.5px;color:var(--muted);}
+  .stage .owner{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+
+  .day{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--surface);}
+  .dayhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:11px 16px;background:var(--surface-2);border-bottom:1px solid var(--line);}
+  .dayhead .d{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);}
+  .dayhead .goal{font-size:14px;color:var(--muted);margin-left:auto;}
+  .block{display:grid;grid-template-columns:86px 1fr;gap:16px;padding:13px 16px;border-top:1px solid var(--line-soft);}
+  .day .block:first-of-type{border-top:none;}
+  .block .t{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;padding-top:2px;}
+  .block .body{display:flex;flex-direction:column;gap:5px;}
+  .block .body p{font-size:14.5px;color:var(--muted);}
+  .block.gate{background:var(--warn-soft);}
+  .block.gate .t{color:var(--warn);font-weight:600;}
+  .block.gate h3{color:var(--warn);}
+  @media (max-width:520px){.block{grid-template-columns:1fr;gap:4px;}}
+
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:4px;background:var(--surface);}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:440px;}
+  th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line-soft);}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--surface-2);}
+  tbody tr:last-child td{border-bottom:none;}
+  td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;}
+  .card ul,.card ol{margin:0;padding-left:19px;display:flex;flex-direction:column;gap:7px;font-size:15px;}
+  .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;}
+
+  .pill{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:3px;background:var(--accent-soft);color:var(--accent);}
+  .pill.warn{background:var(--warn-soft);color:var(--warn);}
+  .pill.ok{background:var(--ok-soft);color:var(--ok);}
+  code{font-family:var(--mono);font-size:.88em;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:3px;padding:1px 4px;}
+  pre{font-family:var(--mono);font-size:13px;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:4px;padding:12px 14px;overflow-x:auto;margin:0;line-height:1.5;}
+  .foot{color:var(--muted);font-size:13.5px;border-top:1px solid var(--line);padding-top:14px;}
+  a{color:var(--accent);}
+  .note{font-size:14.5px;color:var(--muted);}
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Amazon ML Challenge 2026 &middot; Round 1</div>
+    <h1>Business Entity Resolution</h1>
+    <p class="lede">Given business records from three noisy sources with no shared identifiers, decide which records refer to the same real-world business. Source 1 is the clean reference; for every Source 1 entity, find its matches in Source 2 and Source 3 &mdash; which may be zero, one, or many.</p>
+    <div class="clockline">
+      <span><b>WINDOW</b> 25 Sep 00:00 &rarr; 27 Sep 23:59 IST</span>
+      <span><b>METRIC</b> F<sub>0.5</sub>, macro per S1 entity</span>
+      <span><b>BUDGET</b> 5 uploads/day</span>
+      <span><b>MODEL CAP</b> MIT/Apache, &le;8B params</span>
+    </div>
+  </header>
+
+  <section class="alert">
+    <h2>Read this before anything else</h2>
+    <ul>
+      <li><strong>Only the team leader can take the assessment.</strong> The portal states that only the registered team leader may start it. Everyone else works offline; the leader is the only one who touches the portal.</li>
+      <li><strong>The timer does not stop once started.</strong> Duration is 2 days 23:59:00, and it must be started by 25 Sep 00:00 IST to get the full window. Starting later means less time, not a later deadline. Confirm with the leader that it is already running.</li>
+      <li><strong>Ties are broken by submission time.</strong> Equal scores &rarr; the team that submitted earlier ranks higher. Upload a good solution as soon as you have one; do not sit on it.</li>
+      <li><strong>The problem statement overrides the guidelines email on the write-up.</strong> The email said "1&ndash;2 pages"; the problem statement says fill in <code>Documentation_template.md</code> with <em>no page limit</em>. Follow the problem statement.</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sechead"><h2>The task, precisely</h2><span class="eyebrow">What is scored</span></div>
+    <div class="card">
+      <p><strong>Input.</strong> Three tab-separated files per split. Every record has <code>entity_id</code> (prefixed <code>S1-</code> / <code>S2-</code> / <code>S3-</code>), <code>business_name</code>, <code>business_address</code>, <code>country</code>. Read with <code>sep="\t"</code> &mdash; without it pandas silently gives you one column.</p>
+      <p><strong>Output.</strong> One row per test Source 1 entity, with a comma-separated list of matched S2/S3 IDs, empty when there are none. Plus a second file, <code>candidate_pairs.tsv</code>, holding the candidate set your blocking stage fed to the model.</p>
+      <p><strong>The noise is the problem.</strong> Names carry abbreviations (Corp/Corporation, Pvt/Private), legal-suffix mismatches, DBA names, &amp; vs "and", transposed words, typos. Addresses carry Rd/Road, transliterations, missing PIN codes, landmark references ("Near SBI ATM"), reordered components.</p>
+      <p><strong>The trap.</strong> Training covers US and India. <em>The test set adds France, which never appears in training.</em> Nothing may be hard-coded, filtered or one-hot encoded to {US, India}, and every test entity including the French ones must appear in the submission.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead"><h2>The metric decides the strategy</h2><span class="eyebrow">F<sub>0.5</sub>, macro-averaged</span></div>
+    <div class="card">
+      <pre>F_0.5 = (1.25 x P x R) / (0.25 x P + R)</pre>
+      <p class="note">Computed <strong>per Source 1 entity</strong>, then averaged. So every entity counts the same whether it has ten matches or none &mdash; and precision is weighted twice as heavily as recall.</p>
+      <p><strong>Singletons are free marks.</strong> An entity with no true matches scores a full <strong>1.0</strong> if you correctly output an empty list, and <strong>0.0</strong> if you predict anything at all. Guessing on an uncertain entity is not a cheap lottery ticket &mdash; it can cost a whole point.</p>
+      <p><strong>The decision rule that falls out of this:</strong> for an entity where you have one candidate, predict it only when you believe it is a true match <em>more strongly</em> than you believe the entity is a singleton. Otherwise output nothing.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Situation</th><th>You predict</th><th class="num">Score</th></tr></thead>
+          <tbody>
+            <tr><td>1 true match</td><td>exactly it</td><td class="num">1.00</td></tr>
+            <tr><td>1 true match</td><td>it + 1 wrong</td><td class="num">0.56</td></tr>
+            <tr><td>1 true match</td><td>nothing</td><td class="num">0.00</td></tr>
+            <tr><td>No true match</td><td>nothing</td><td class="num">1.00</td></tr>
+            <tr><td>No true match</td><td>anything</td><td class="num">0.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Read the middle rows together: adding a wrong ID next to a right one costs about 0.44, but firing on a singleton costs the full 1.00. <strong>When in doubt, stay silent.</strong></p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead"><h2>The pipeline</h2><span class="eyebrow">Five stages, four owners</span></div>
+    <div class="pipeline">
+      <div class="stage">
+        <div class="n">1</div>
+        <div class="body">
+          <span class="owner">Owner A &middot; hour 0&ndash;4</span>
+          <h3>Normalise, and build the scoring harness</h3>
+          <p>Unicode-fold, lowercase, strip punctuation, expand the abbreviation table both ways (corp&rarr;corporation, rd&rarr;road, pvt&rarr;private). Pull numeric tokens &mdash; street numbers, PIN codes &mdash; into their own fields. Then implement <strong>F<sub>0.5</sub> macro exactly as specified</strong> and hold out a split of Source 1 entities. Everything the team quotes for three days comes out of this function.</p>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="n">2</div>
+        <div class="body">
+          <span class="owner">Owner B &middot; hour 4&ndash;16</span>
+          <h3>Blocking / candidate generation</h3>
+          <p>Character n-gram TF-IDF over name (and address), sparse cosine, top-k neighbours per S1 entity. This sets the <strong>ceiling on recall</strong> &mdash; a true match not in your candidate set can never be recovered downstream. Measure two numbers and keep measuring them: recall of the candidate set, and reduction ratio. Aim high on recall, generous k; precision is the model's job, not blocking's.</p>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="n">3</div>
+        <div class="body">
+          <span class="owner">Owner C &middot; hour 8&ndash;30</span>
+          <h3>Pairwise features</h3>
+          <p>Per candidate pair: TF-IDF cosine on name and on address, token Jaccard, Jaro-Winkler and Levenshtein ratio, IDF-weighted rare-token overlap (a shared rare word means far more than a shared "restaurant"), numeric-token exact match, length ratios, same-country flag, and counts of each side's tokens. Rare-token overlap and numeric match are usually the two strongest features in this kind of task.</p>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="n">4</div>
+        <div class="body">
+          <span class="owner">Owner B + C &middot; hour 20&ndash;44</span>
+          <h3>Pairwise classifier</h3>
+          <p>Gradient boosting (LightGBM / XGBoost) over those features. Positives come from the ground truth; negatives are the <em>hard</em> ones &mdash; candidates your blocking produced that are not true matches. Random negatives teach the model nothing. Optionally add a small open-licence sentence embedding for semantic name similarity; check it is MIT/Apache and under 8B before it goes anywhere near the final pipeline.</p>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="n">5</div>
+        <div class="body">
+          <span class="owner">Team lead &middot; hour 30&ndash;68</span>
+          <h3>Thresholding &mdash; where the score actually comes from</h3>
+          <p>Sweep the decision threshold against F<sub>0.5</sub> on the held-out split, and treat "output empty" as a real prediction rather than a fallback. Expect the optimum to sit well above 0.5. This one sweep is usually worth more than another model.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead"><h2>The France test</h2><span class="eyebrow">Generalisation check</span></div>
+    <div class="card">
+      <p>The test set contains a country the training data has never seen, so a model that has quietly learned "US addresses look like this, Indian ones like that" will fall over on a third of the private leaderboard.</p>
+      <p><strong>Cheap way to catch it:</strong> train on US records only, validate on India only. If the score collapses, the pipeline is country-dependent and needs fixing before day 3 &mdash; not discovered after the private leaderboard opens.</p>
+      <p class="note">Practical consequences: no country-specific regexes as hard rules, no one-hot over the observed country set, and keep character-level features that work on any script.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead"><h2>The 72 hours</h2><span class="eyebrow">All times IST</span></div>
+
+    <div class="day">
+      <div class="dayhead"><span class="d">Day 1 &mdash; 25 Sep</span><span class="goal">Goal: a scored submission on the board before you sleep.</span></div>
+      <div class="block">
+        <div class="t">00:00&ndash;02:00</div>
+        <div class="body"><h3>Leader starts the timer; everyone reads the PS</h3><p>Download <code>student_resource/</code>, confirm the folder has <code>utils/validate_submission.py</code> and <code>Documentation_template.md</code>. Read the problem statement together on a call. Agree out loud what F<sub>0.5</sub> punishes.</p></div>
+      </div>
+      <div class="block">
+        <div class="t">02:00&ndash;06:00</div>
+        <div class="body"><h3>Normalisation + metric + validation split</h3><p>Split by <em>Source 1 entity</em>, never by pair. Implement the macro F<sub>0.5</sub> and sanity-check it against the worked example in the problem statement (0.714). If your function disagrees with that number, fix it before writing another line.</p></div>
+      </div>
+      <div class="block gate">
+        <div class="t">by 10:00</div>
+        <div class="body"><h3>Gate 1 &mdash; rules-only baseline, uploaded</h3><p>TF-IDF blocking + a single cosine threshold, no ML at all. Run <code>validate_submission.py</code>, then upload. It proves the format, calibrates public-vs-local, and it will score better than anyone expects. <span class="pill warn">Never upload without the validator passing</span></p></div>
+      </div>
+      <div class="block">
+        <div class="t">10:00&ndash;23:00</div>
+        <div class="body"><h3>Blocking quality, then first features</h3><p>B pushes candidate recall up and reports the recall ceiling. C starts the feature table on whatever candidates exist. Lead starts filling <code>Documentation_template.md</code> today, not on day 3. <span class="pill">2&ndash;3 uploads used</span></p></div>
+      </div>
+    </div>
+
+    <div class="day">
+      <div class="dayhead"><span class="d">Day 2 &mdash; 26 Sep</span><span class="goal">Goal: trained classifier beating the rules baseline, and the threshold swept.</span></div>
+      <div class="block">
+        <div class="t">morning</div>
+        <div class="body"><h3>Stand-up, 15 minutes</h3><p>Three numbers on the board: candidate recall, classifier AUC, and local F<sub>0.5</sub>. Anything not moving one of those three gets dropped today.</p></div>
+      </div>
+      <div class="block">
+        <div class="t">day</div>
+        <div class="body"><h3>Train on hard negatives, then sweep the threshold</h3><p>Fit LightGBM on the candidate-derived pairs. Then do the threshold sweep &mdash; it typically moves the score more than any modelling change. Run the US&rarr;India generalisation check the same day.</p></div>
+      </div>
+      <div class="block gate">
+        <div class="t">48h mark</div>
+        <div class="body"><h3>Gate 2 &mdash; freeze the architecture</h3><p>Whatever is best now <em>is</em> the approach; from here you only tune and harden. Also: top 500 teams get $100 extra AWS credits at this mark &mdash; someone check and claim.</p></div>
+      </div>
+      <div class="block">
+        <div class="t">evening</div>
+        <div class="body"><h3>Assemble the zip skeleton</h3><p>Build <code>&lt;team&gt;_submission.zip</code> now with whatever is current, so day 3 is a refresh rather than a scramble. <span class="pill">3&ndash;4 uploads used</span></p></div>
+      </div>
+    </div>
+
+    <div class="day">
+      <div class="dayhead"><span class="d">Day 3 &mdash; 27 Sep</span><span class="goal">Goal: submitted, packaged, asleep before midnight.</span></div>
+      <div class="block">
+        <div class="t">morning</div>
+        <div class="body"><h3>No new ideas</h3><p>Re-sweep the threshold on the full training data, check the singleton rate in your predictions against the rate in training, and eyeball fifty predicted matches by hand. A new idea today is a bug with a deadline attached.</p></div>
+      </div>
+      <div class="block gate">
+        <div class="t">by 18:00</div>
+        <div class="body"><h3>Gate 3 &mdash; code freeze</h3><p>Final run, both TSVs regenerated together so <code>matching_results</code> is genuinely a subset of <code>candidate_pairs</code>. Validator green.</p></div>
+      </div>
+      <div class="block">
+        <div class="t">18:00&ndash;21:00</div>
+        <div class="body"><h3>Package and document</h3><p><code>code/business_entity_resolution/</code> with <code>src/</code>, a README that regenerates both outputs end to end, and a pinned <code>requirements.txt</code>. Fill the methodology template properly &mdash; the top teams' packages are read in detail before final rankings.</p></div>
+      </div>
+      <div class="block gate">
+        <div class="t">by 21:00</div>
+        <div class="body"><h3>Gate 4 &mdash; final upload, confirmed</h3><p>Leader uploads; everyone confirms the SCORED status on the portal with a screenshot in chat. Then stop. <span class="pill warn">Never submit in the last hour</span></p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead"><h2>Spending the 15 uploads</h2><span class="eyebrow">Plan, don't improvise</span></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Day</th><th>Reserve for</th><th class="num">Use</th><th class="num">Hold</th></tr></thead>
+        <tbody>
+          <tr><td>Day 1</td><td>Rules baseline, better blocking, best-of-day</td><td class="num">3</td><td class="num">2</td></tr>
+          <tr><td>Day 2</td><td>First classifier, post-threshold-sweep</td><td class="num">4</td><td class="num">1</td></tr>
+          <tr><td>Day 3</td><td>Refinements and the final &mdash; keep one in hand</td><td class="num">4</td><td class="num">1</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Rule: it only goes up if it beats the current best on <em>local</em> F<sub>0.5</sub>, and only after <code>validate_submission.py</code> exits 0. The public board is a subset; the private board decides the ranking.</p>
+  </section>
+
+  <section class="redlines">
+    <h2>Red lines &mdash; instant disqualification</h2>
+    <ul>
+      <li><strong>No external lookup of business identities.</strong> No commercial entity-resolution APIs, no government business registries, <strong>no geocoding APIs for address normalisation</strong>, no internet data augmentation of any kind. Code pipelines are reviewed.</li>
+      <li>Final model must be <strong>MIT or Apache 2.0 licensed and at most 8B parameters</strong>. Check the licence before adding any pretrained model.</li>
+      <li>Multiple accounts or IDs; one person on more than one team; sharing code or predictions between teams.</li>
+      <li>Simultaneous logins for the same participant.</li>
+    </ul>
+    <p class="note" style="color:var(--ink)">Everything built from the provided training data is fair game: any library, feature engineering, gradient boosting, open-licence embeddings within the cap.</p>
+  </section>
+
+  <section>
+    <div class="sechead"><h2>Deliverables checklist</h2><span class="eyebrow">All of it, or it is not evaluated</span></div>
+    <div class="two">
+      <div class="card">
+        <h3>Uploaded during the challenge</h3>
+        <ul>
+          <li><code>matching_results.tsv</code> &mdash; the only file scored on the leaderboard</li>
+          <li>Exact column names, tab-separated, one row per test S1 entity</li>
+          <li>Empty <code>matched_entity_ids</code> for singletons, no duplicate IDs, S2/S3 only</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>The zip, from every team</h3>
+        <ul>
+          <li><code>output/</code> &mdash; both TSVs, matches a subset of candidates</li>
+          <li><code>code/business_entity_resolution/src/</code> + <code>README.md</code> + <code>requirements.txt</code></li>
+          <li><code>Documentation_template.md</code>, filled in &mdash; methodology, blocking strategy, architecture and feature engineering</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead"><h2>Working together without friction</h2><span class="eyebrow">Cheap habits, large payoff</span></div>
+    <div class="two">
+      <div class="card">
+        <h3>Set up in the first hour</h3>
+        <ul>
+          <li><strong>One shared repo or drive:</strong> <code>data/</code>, <code>src/</code>, <code>outputs/</code>, <code>doc/</code> &mdash; matching the required zip layout from the start.</li>
+          <li><strong>One experiment sheet:</strong> who, what changed, candidate recall, local F<sub>0.5</sub>, public score, file name. Unlogged runs do not exist.</li>
+          <li><strong>File naming:</strong> <code>sub_03_lgbm_thr0.72_f0.641.tsv</code> &mdash; score in the name, so nobody has to ask.</li>
+          <li><strong>One voice channel</strong> open and muted all three days.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Rules that prevent the usual fights</h3>
+        <ul>
+          <li><strong>The leader alone uploads</strong> &mdash; and is the only one who can, per the portal rules.</li>
+          <li><strong>Nobody changes the validation split</strong> after hour 6. If it changes, every past number is void.</li>
+          <li><strong>Sleep in shifts.</strong> Two sharp people beat four exhausted ones at hour 60.</li>
+          <li><strong>Disagreements go to the split,</strong> not to argument. Run both, compare F<sub>0.5</sub>, move on.</li>
+          <li><strong>Say "I'm stuck" at 30 minutes,</strong> not at three hours.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot">Built from the released problem statement, the guidelines email of 24 Sep 2026, and the portal instructions screenshot. Where the problem statement and the guidelines email disagree, the problem statement is the newer document and wins. Queries go through the official Google Form; the response sheet carries clarifications from the Amazon leads &mdash; check it at least once a day.</p>
+
+</div>

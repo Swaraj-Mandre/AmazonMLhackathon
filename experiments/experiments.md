@@ -6,7 +6,7 @@ cannot describe it in the methodology document that Amazon reviews.
 
 Local F₀.₅ is always measured on the held-out 15% of Source 1 entities
 (`VALIDATION_FRACTION` in `config.py`). Never quote a number from a different
-split — if the split changes, every row above the change becomes meaningless and
+split, if the split changes, every row above the change becomes meaningless and
 must be marked as such.
 
 ## Reference points
@@ -22,7 +22,7 @@ must be marked as such.
 
 | # | Date | Who | Phase | What changed | Cand. recall | Local F₀.₅ | Public LB | Uploaded? | Output file |
 |---|---|---|---|---|---|---|---|---|---|
-| — | 2026-09-25 | — | 0 | Baseline reference: predict empty for every entity | — | 0.0558 | — | no | — |
+| n/a | 2026-09-25 | n/a | 0 | Baseline reference: predict empty for every entity | n/a | 0.0558 | n/a | no | n/a |
 
 ## Upload budget
 
@@ -36,7 +36,7 @@ must be marked as such.
 
 ## Open questions
 
-- [ ] `test_source3.tsv` missing from the download — leader to fetch the second
+- [ ] `test_source3.tsv` missing from the download, leader to fetch the second
       Google Drive part.
 - [ ] How much does transliteration actually recover? Measure candidate recall on
       the Devanagari subset specifically, with and without it.
