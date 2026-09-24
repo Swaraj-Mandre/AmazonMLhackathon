@@ -1,0 +1,24 @@
+# Provided data — ~2 GB, never committed. Everyone downloads it from the
+# portal link the team leader shared and puts it in data/raw/.
+data/raw/train/
+data/raw/test/
+data/raw/_original_download/
+data/interim/
+
+# Generated submissions. The final pair gets committed deliberately on day 3,
+# so this is a default, not a rule.
+output/*.tsv
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.ipynb_checkpoints/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

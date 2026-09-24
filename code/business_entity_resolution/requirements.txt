@@ -1,0 +1,17 @@
+# Pinned to the versions the pipeline was developed and scored against.
+# All permissively licensed (BSD/MIT/Apache-2.0). No pretrained model is used
+# by the current pipeline; anything added later must be MIT/Apache-2.0 and at
+# most 8B parameters per the challenge constraints.
+
+pandas==3.0.5
+numpy==2.5.1
+scikit-learn==1.9.0
+scipy==1.18.0
+pyarrow==25.0.0
+
+# Fast C++ string metrics (Levenshtein, Jaro-Winkler, token-set ratio).
+# Pure-Python equivalents are far too slow at this candidate volume.
+rapidfuzz==3.15.0
+
+# Gradient-boosted pair classifier.
+lightgbm==4.7.0
