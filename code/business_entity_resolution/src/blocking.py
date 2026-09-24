@@ -52,7 +52,11 @@ VECTORIZER_KWARGS = dict(
     max_df=0.2,
 )
 
-CANDIDATE_CHUNK = 20_000
+# Each chunk forms a sparse product of (chunk x vocab) against (vocab x records).
+# With many records on the query side that intermediate dominates memory, and it
+# scales linearly with the chunk size, so this is the main dial for peak usage.
+# 6,000 keeps the run under control on a 16 GB machine.
+CANDIDATE_CHUNK = 6_000
 
 
 def fit_vectorizer(texts: pd.Series, sample: int = 1_000_000,

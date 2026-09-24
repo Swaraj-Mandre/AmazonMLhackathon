@@ -1,3 +1,11 @@
 Loading test data...
   1,732,544 Source 1 entities to produce matches for
   S2 / France: 259,452 entities x 703,378 records
+    -> 2,825,412 pairs in 133s
+  S2 / India: 809,986 entities x 2,312,565 records
+    -> 7,963,236 pairs in 377s
+  S2 / US: 663,106 entities x 1,871,330 records
+    -> 6,608,891 pairs in 437s
+  S3 / France: 259,452 entities x 731,615 records
+    -> 2,865,468 pairs in 197s
+  S3 / India: 809,986 entities x 2,405,000 records

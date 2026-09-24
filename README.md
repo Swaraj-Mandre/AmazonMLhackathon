@@ -277,3 +277,59 @@ Three rules came out of fixing it:
 
 Also: free big frames with `del` and call `gc.collect()` between country blocks.
 `run_baseline.py` shows the pattern.
+
+Two more that cost us a full run each on the test set:
+
+4. **Never hold millions of pairs as Python strings.** The test run produces
+   about 36 million candidate pairs. As strings that is over 8 GB and it killed
+   the machine. Entity IDs are a `S1-`/`S2-`/`S3-` prefix plus digits with no
+   leading zeros (checked on all 11,702,133 test IDs), so `encode_ids()` turns
+   them into int64 plus a source byte. Measured cost: **21 bytes per pair.**
+   Write output with `write_id_lists_coded()`, which sorts the coded arrays and
+   emits rows without ever building a `{record: set(ids)}` dictionary.
+5. **`CANDIDATE_CHUNK` in `blocking.py` is the main memory dial.** Each chunk
+   makes a sparse product of (chunk x vocabulary) against (vocabulary x records),
+   and that intermediate scales linearly with the chunk size. At 20,000 the first
+   block alone reached 5.8 GB; at 6,000 the same block runs at 2.2 GB with the
+   same output and the same runtime. If you hit memory trouble, lower this first.
+
+## 10. Help files for working with an AI assistant
+
+We each use different assistants, and every new chat starts knowing nothing about
+this project. Explaining it from scratch each time wastes effort and the answers
+come back wrong, because the assistant guesses at things we already measured.
+
+So we have put a set of briefing files in [`handoff/`](handoff/). We can paste
+these into our individual chatbots to continue from wherever the last person
+stopped.
+
+**How to use them:**
+
+1. Open a new chat with whatever assistant you use.
+2. Paste [`handoff/01_PROJECT_CONTEXT.md`](handoff/01_PROJECT_CONTEXT.md) first.
+   That is the shared background: the problem, the scoring, everything we
+   measured, what is already built, and the traps.
+3. Paste the file for the phase you claimed, for example
+   [`handoff/02_PHASE2_BLOCKING.md`](handoff/02_PHASE2_BLOCKING.md).
+4. Ask your question normally.
+
+| File | Use it for |
+|---|---|
+| [`00_START_HERE.md`](handoff/00_START_HERE.md) | How this works, read once |
+| [`01_PROJECT_CONTEXT.md`](handoff/01_PROJECT_CONTEXT.md) | Always, at the start of every chat |
+| [`02_PHASE2_BLOCKING.md`](handoff/02_PHASE2_BLOCKING.md) | Candidate generation |
+| [`03_PHASE3_FEATURES.md`](handoff/03_PHASE3_FEATURES.md) | Pair features |
+| [`04_PHASE4_MODEL.md`](handoff/04_PHASE4_MODEL.md) | Training the classifier |
+| [`05_CODE_MAP.md`](handoff/05_CODE_MAP.md) | Exact function names and signatures |
+| [`06_RULES_AND_TRAPS.md`](handoff/06_RULES_AND_TRAPS.md) | Rules, deadlines, output format |
+
+**Two things to be careful about:**
+
+- **Never paste the dataset or any rows from it** into a chatbot. The rules
+  forbid taking our data outside the challenge, and the files are gigabytes
+  anyway. The context file describes the columns, which is all an assistant
+  needs.
+- **Check whatever it writes.** Assistants sound confident even when they are
+  wrong. Run `run_baseline.py --validate` and compare the F0.5 against
+  [`experiments/experiments.md`](experiments/experiments.md). If a change does
+  not move that number, it did not help.
