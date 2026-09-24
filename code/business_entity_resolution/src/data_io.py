@@ -220,6 +220,104 @@ def _write_id_lists(path: Path, columns: list[str], rows: dict[str, set[str]],
             fh.write(f"{eid}\t{','.join(sorted(ids))}\n")
 
 
+def encode_ids(ids) -> tuple["np.ndarray", "np.ndarray"]:
+    """Split entity IDs into a numeric part and a source number.
+
+    Every ID in the data is a ``S1-``/``S2-``/``S3-`` prefix followed by digits
+    with no leading zeros (verified across all 11,702,133 test IDs), so this
+    round-trips exactly. It matters because the prediction run produces tens of
+    millions of pairs: as Python strings those cost gigabytes, as int64 plus a
+    source byte they cost about 9 bytes each.
+    """
+    import numpy as np
+    import pandas as pd
+
+    s = pd.Series(ids, dtype="string").astype(str)
+    src = s.str.slice(1, 2).to_numpy().astype(np.uint8)
+    num = s.str.slice(3).to_numpy().astype(np.int64)
+    return num, src
+
+
+def write_id_lists_coded(path: Path, columns: list[str],
+                         left_num, right_num, right_src, order_num) -> int:
+    """Write an ID-list TSV from integer-coded pairs, in the given row order.
+
+    Sorts the pairs once, records where each left-hand ID's run begins, then
+    walks ``order_num`` so the output keeps the test file's own row order. Never
+    materialises the ID strings for more than one row at a time.
+    """
+    import numpy as np
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    idx = np.argsort(left_num, kind="stable")
+    left_num = left_num[idx]
+    right_num = right_num[idx]
+    right_src = right_src[idx]
+
+    if len(left_num):
+        starts = np.flatnonzero(np.r_[True, left_num[1:] != left_num[:-1]])
+        ends = np.r_[starts[1:], len(left_num)]
+        spans = dict(zip(left_num[starts].tolist(), zip(starts.tolist(), ends.tolist())))
+    else:
+        spans = {}
+
+    written = 0
+    with open(path, "w", encoding="utf-8", newline="") as fh:
+        fh.write("\t".join(columns) + "\n")
+        for eid in order_num.tolist():
+            span = spans.get(eid)
+            if span is None:
+                fh.write(f"S1-{eid}\t\n")
+                continue
+            s, e = span
+            # Duplicates inside one list are a rejection, so collapse them here.
+            ids = sorted({f"S{src}-{num}" for num, src
+                          in zip(right_num[s:e].tolist(), right_src[s:e].tolist())})
+            written += len(ids)
+            fh.write(f"S1-{eid}\t{','.join(ids)}\n")
+    return written
+
+
+def write_id_lists_from_pairs(path: Path, columns: list[str], pairs,
+                              id_col: str, order: list[str]) -> int:
+    """Write an ID-list TSV straight from a pair frame, without building dicts.
+
+    ``{entity: set(ids)}`` is the obvious intermediate, but a Python set costs
+    roughly 60 bytes per element and the test run produces tens of millions of
+    pairs, so the dictionary alone runs to gigabytes. Sorting the pair arrays and
+    walking them in order needs one index of 1.7 million offsets instead.
+
+    Returns the number of IDs written.
+    """
+    import numpy as np
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    left = pairs["source1_entity_id"].to_numpy()
+    right = pairs[id_col].to_numpy()
+
+    order_index = np.argsort(left, kind="stable")
+    left, right = left[order_index], right[order_index]
+    # Start offset of each run of equal source1 IDs.
+    starts = np.flatnonzero(np.r_[True, left[1:] != left[:-1]]) if len(left) else np.empty(0, int)
+    ends = np.r_[starts[1:], len(left)] if len(starts) else np.empty(0, int)
+    spans = {left[s]: (s, e) for s, e in zip(starts, ends)}
+
+    written = 0
+    with open(path, "w", encoding="utf-8", newline="") as fh:
+        fh.write("\t".join(columns) + "\n")
+        for eid in order:
+            span = spans.get(eid)
+            if span is None:
+                fh.write(f"{eid}\t\n")
+                continue
+            s, e = span
+            # Duplicates inside one list are a rejection, so de-duplicate here.
+            ids = sorted(set(right[s:e].tolist()))
+            written += len(ids)
+            fh.write(f"{eid}\t{','.join(ids)}\n")
+    return written
+
+
 def write_matching_results(path: Path, matches: dict[str, set[str]],
                            order: list[str]) -> None:
     """Write ``matching_results.tsv``, the file scored on the leaderboard."""

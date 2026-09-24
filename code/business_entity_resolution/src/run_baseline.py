@@ -45,14 +45,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from blocking import fit_vectorizer, generate_candidates, to_id_lists  # noqa: E402
 from config import (  # noqa: E402
+    CANDIDATE_COLUMNS,
     CANDIDATE_PAIRS,
     MATCHING_RESULTS,
     RANDOM_SEED,
+    RESULT_COLUMNS,
     TEST_SOURCES,
     TRAIN_SOURCES,
 )
 from data_io import (  # noqa: E402
+    encode_ids,
+    write_id_lists_coded,
     load_ground_truth,
+    write_id_lists_from_pairs,
     load_source,
     load_source_country,
     split_entities,
@@ -124,6 +129,37 @@ def build_pairs(queries: pd.DataFrame, tags: list[str], load_block: BlockLoader,
     if not frames:
         return pd.DataFrame(columns=["source1_entity_id", "candidate_entity_id", "cos_name"])
     return pd.concat(frames, ignore_index=True)
+
+
+def iter_block_pairs(queries: pd.DataFrame, tags: list[str], load_block: BlockLoader,
+                     verbose: bool = True, min_score: float = BLOCK_MIN_SCORE):
+    """Same work as :func:`build_pairs`, yielding each block instead of concatenating.
+
+    Prediction consumes blocks one at a time and compacts each to integer codes,
+    so the full string-valued pair set never exists at once.
+    """
+    for tag in tags:
+        for country in sorted(queries["country"].unique()):
+            q = queries[queries["country"] == country]
+            if q.empty:
+                continue
+            c = load_block(tag, country)
+            if c is None or c.empty:
+                continue
+            if verbose:
+                print(f"  {tag} / {country}: {len(q):,} entities x {len(c):,} records",
+                      flush=True)
+            t0 = time.time()
+            vec = fit_vectorizer(pd.concat([q["core_name"], c["core_name"]],
+                                           ignore_index=True))
+            pairs = generate_candidates(q, c, top_k=TOP_K_PER_CANDIDATE,
+                                        min_score=min_score, vectorizer=vec,
+                                        verbose=False)
+            if verbose:
+                print(f"    -> {len(pairs):,} pairs in {time.time()-t0:.0f}s", flush=True)
+            del c, vec
+            gc.collect()
+            yield pairs
 
 
 def apply_exclusivity(pairs: pd.DataFrame) -> pd.DataFrame:
@@ -253,8 +289,8 @@ def run_validate(sample: int, min_score: float) -> None:
 def run_predict(threshold: float, exclusive: bool, min_score: float) -> None:
     print("Loading test data...", flush=True)
     s1 = load_source(TEST_SOURCES["S1"], columns=COLUMNS)
-    order = s1["entity_id"].tolist()
-    print(f"  {len(order):,} Source 1 entities to produce matches for", flush=True)
+    order_num, _ = encode_ids(s1["entity_id"])
+    print(f"  {len(order_num):,} Source 1 entities to produce matches for", flush=True)
 
     def load_block(tag: str, country: str) -> pd.DataFrame | None:
         path = TEST_SOURCES[tag]
@@ -263,26 +299,51 @@ def run_predict(threshold: float, exclusive: bool, min_score: float) -> None:
             return None
         return load_source_country(path, country, columns=COLUMNS)
 
-    pairs = build_pairs(s1, ["S2", "S3"], load_block, min_score=min_score)
-    if exclusive:
-        pairs = apply_exclusivity(pairs)
+    # Each block's pairs are converted to integer codes and the string frame is
+    # dropped straight away. Holding all 36 million pairs as Python strings is
+    # what exhausted memory on the first attempt; as int64 plus a source byte
+    # the same pairs cost well under a gigabyte.
+    left, right, rsrc, cos = [], [], [], []
+    for block in iter_block_pairs(s1, ["S2", "S3"], load_block, min_score=min_score):
+        if exclusive:
+            block = apply_exclusivity(block)
+        ln, _ = encode_ids(block["source1_entity_id"])
+        rn, rs = encode_ids(block["candidate_entity_id"])
+        left.append(ln)
+        right.append(rn)
+        rsrc.append(rs)
+        cos.append(block["cos_name"].to_numpy().astype(np.float32))
+        del block
+        gc.collect()
+
+    left_num = np.concatenate(left) if left else np.empty(0, np.int64)
+    right_num = np.concatenate(right) if right else np.empty(0, np.int64)
+    right_src = np.concatenate(rsrc) if rsrc else np.empty(0, np.uint8)
+    scores = np.concatenate(cos) if cos else np.empty(0, np.float32)
+    del left, right, rsrc, cos
+    gc.collect()
+    print(f"\n  {len(left_num):,} candidate pairs total "
+          f"({left_num.nbytes + right_num.nbytes + right_src.nbytes + scores.nbytes:,} bytes)",
+          flush=True)
 
     # candidate_pairs.tsv must be exactly what the matching stage scored, so it
     # is written from the same frame the threshold is applied to, never from an
     # earlier and wider blocking pass.
-    candidates = to_id_lists(pairs)
-    matches = to_id_lists(pairs[pairs["cos_name"] >= threshold])
-
-    write_candidate_pairs(CANDIDATE_PAIRS, candidates, order)
-    write_matching_results(MATCHING_RESULTS, matches, order)
-
-    n_match = sum(len(v) for v in matches.values())
-    n_singleton = sum(1 for e in order if not matches.get(e))
-    print(f"\n  wrote {CANDIDATE_PAIRS.name}: "
-          f"{sum(len(v) for v in candidates.values()):,} candidates")
+    #
+    # Written straight from the pair arrays rather than via {entity: set(ids)}.
+    # At tens of millions of pairs the dictionary form costs more memory than
+    # everything else in the run put together.
+    n_cand = write_id_lists_coded(CANDIDATE_PAIRS, CANDIDATE_COLUMNS,
+                                  left_num, right_num, right_src, order_num)
+    keep = scores >= threshold
+    n_match = write_id_lists_coded(MATCHING_RESULTS, RESULT_COLUMNS,
+                                   left_num[keep], right_num[keep], right_src[keep],
+                                   order_num)
+    n_singleton = len(order_num) - len(np.unique(left_num[keep]))
+    print(f"\n  wrote {CANDIDATE_PAIRS.name}: {n_cand:,} candidates")
     print(f"  wrote {MATCHING_RESULTS.name}: {n_match:,} matches, "
           f"{n_singleton:,} entities predicted as singletons "
-          f"({n_singleton/len(order):.1%})")
+          f"({n_singleton/len(order_num):.1%})")
     print("\n  Now run the official validator before uploading:")
     print("    python data/raw/provided/validate_submission.py \\\n"
           "        --matching output/matching_results.tsv \\\n"
