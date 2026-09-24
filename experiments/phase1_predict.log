@@ -9,3 +9,19 @@ Loading test data...
   S3 / France: 259,452 entities x 731,615 records
     -> 2,865,468 pairs in 197s
   S3 / India: 809,986 entities x 2,405,000 records
+    -> 9,030,051 pairs in 707s
+  S3 / US: 663,106 entities x 1,945,701 records
+    -> 6,774,435 pairs in 446s
+
+  36,067,493 candidate pairs total (757,417,353 bytes)
+
+  wrote candidate_pairs.tsv: 36,067,493 candidates
+  wrote matching_results.tsv: 12,918,475 matches, 327,203 entities predicted as singletons (18.9%)
+
+  Now run the official validator before uploading:
+    python data/raw/provided/validate_submission.py \
+        --matching output/matching_results.tsv \
+        --candidate output/candidate_pairs.tsv \
+        --test-dir data/raw/test
+
+Total runtime: 2365s

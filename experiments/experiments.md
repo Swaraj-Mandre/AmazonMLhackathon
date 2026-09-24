@@ -26,6 +26,7 @@ becomes meaningless and must be marked as such.
 | 0 | 25 Sep | n/a | n/a | Reference: predict empty for everyone | n/a | 0.0561 | n/a | no |
 | 1 | 25 Sep | Claude | 1 | TF-IDF cosine on core name, blocked by country, block-min 0.30, accept 0.92, exclusivity off | 0.7123 | **0.5659** | | not yet |
 | 2 | 25 Sep | Claude | 1 | Same, blocking cutoff raised to 0.60 | 0.6554 | 0.5658 | | not yet |
+| 3 | 25 Sep | Claude | 1 | **Test run.** Same settings as run 2, applied to the full test set. Validator PASS | n/a | n/a | pending | ready |
 
 Run 2 exists to show that tightening the blocking cutoff from 0.30 to 0.60 costs
 nothing at this accept threshold (0.5658 against 0.5659) while halving the number
@@ -96,9 +97,28 @@ back here once we have it.
 
 | Day | Used | Remaining | Notes |
 |---|---:|---:|---|
-| 25 Sep | 0 | 5 | baseline ready once the official validator passes |
+| 25 Sep | 0 | 5 | baseline built, validator PASS, handed to the leader |
 | 26 Sep | 0 | 5 | |
 | 27 Sep | 0 | 5 | keep one in hand until the end |
+
+## Test run 3, the shipped baseline
+
+| Measure | Value |
+|---|---|
+| Runtime | 2,365s (39 min) on 16 GB, CPU only |
+| Candidate pairs | 36,067,493 |
+| Memory for those pairs | 757 MB (integer coded; as strings it was 8.7 GB and killed the run) |
+| Matches predicted | 12,918,475, about 7.5 per record |
+| Records predicted as singletons | 327,203 (18.9%) |
+| Official validator | PASS |
+
+Two numbers to compare against the leaderboard when it comes back. We predict
+18.9% of records as having no match, against a true rate of 5.58% in training, so
+the threshold of 0.92 is running conservative, which is the right direction for
+F0.5 but leaves recall on the table. And we predict about 7.5 matches for the
+records we do answer, against a true mean of 3.46, so on those records we are
+over-predicting. Both are expected from a threshold-only rule with no model to
+separate near misses, and both should improve in phase 4.
 
 ## Open questions
 
