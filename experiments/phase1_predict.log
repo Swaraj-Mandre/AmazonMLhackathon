@@ -3,3 +3,5 @@ Loading test data...
   S2 / France: 259,452 entities x 703,378 records
     -> 2,825,412 pairs in 138s
   S2 / India: 809,986 entities x 2,312,565 records
+    -> 7,963,236 pairs in 377s
+  S2 / US: 663,106 entities x 1,871,330 records
